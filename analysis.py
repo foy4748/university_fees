@@ -1,6 +1,11 @@
 from openpyxl import load_workbook as lw
 import unidecode
+
+#Native libraries
 import re
+import csv
+import os
+#################
 
 #Reading the Workbook
 wb = lw('US-News Ranking.xlsx', data_only= True)
@@ -8,6 +13,10 @@ wb = lw('US-News Ranking.xlsx', data_only= True)
 #Getting sheet names
 sheets = wb.sheetnames
 
+#Getting rid of previously stored data
+files = os.listdir("./")
+if "compiled.csv" in files:
+    os.remove("compiled.csv")
 
 #Finds which column contains tuition fee
 def tuitionColumn(sheetname, wb):
@@ -18,7 +27,7 @@ def tuitionColumn(sheetname, wb):
         cell = w_sh.cell(row=1,column=j).value
         if cell == None:
             continue
-        matched = re.search(r"(^tuition)", cell, re.IGNORECASE)
+        matched = re.search(r"^tuition", cell, re.IGNORECASE)
         if matched != None:
             col = j
             break
@@ -33,33 +42,30 @@ def readSheet(sheetname, wb,tC): #tC = tuition column
         return
     i = 2
     w_sh = wb[sheetname]
-    lst = []
-    while w_sh.cell(row=i, column=tC).value != None:
-        university = w_sh.cell(row=i, column=2).value
-        university = unidecode.unidecode(university)
-        tuition_fee = w_sh.cell(row=i, column=tC).value
-        try:
-            tuition_fee = float(re.sub(r'[\D]', "", tuition_fee))
-        except:
-            tuition_fee = ''
-        lst.append((university,sheetname,tuition_fee))
-        i = i + 1
-    return lst
+    with open('compiled.csv','a+',newline='') as f:
+        cursor = csv.writer(f)
+        while w_sh.cell(row=i, column=tC).value != None:
+            university = w_sh.cell(row=i, column=2).value
+            university = unidecode.unidecode(university)
+            tuition_fee = w_sh.cell(row=i, column=tC).value
+
+            if type(tuition_fee) is float:
+                tf = tuition_fee
+            else:
+                try:
+                    tf = float(re.sub(r'[\D]', "", tuition_fee))
+                except:
+                    tf = ''
+            cursor.writerow([university,sheetname,tf])
+            i = i + 1
 
 #Main
 if __name__ == '__main__':
+    lst = []
     for sheet in sheets:
-        tc = tuitionColumn(sheet,wb) 
-        temp = readSheet(sheet,wb,tc)
-        if temp == None:
+        tc = tuitionColumn(sheet, wb)
+        if tc == None:
             continue
-        else:
-            for i in temp:
-                print(i)
-        temp.clear()
-
-
-
-
-
-
+        lst.append((sheet, tc))
+    for i in lst:
+        readSheet(i[0], wb, i[1])
